@@ -1,74 +1,64 @@
-# starter_v0 — intentionally incomplete first-draft declarations.
-# Students improve routing guidance, argument conventions, missing-information
-# handling, and confirmation boundaries through v1/v2/v3.
-#
-# If a tool is renamed, keep the name synchronized across:
-#   this file -> tools/__init__.py -> data/eval_base.json
-#   -> data/eval_helpdesk_extension.json -> report/demo text
 tools:
   # ---------------- Core tools ----------------
   # v1 change: clarify is the required control tool for missing or ambiguous input.
   - name: clarify
-    # v2 change: include explicit approval of the current write payload.
-    # v3.2 change: cover requests whose intended capability is not yet clear.
-    description: "Bắt buộc dùng khi chưa đủ thông tin để xác định ý định hoặc chọn công cụ, khi thiếu thông tin cần thiết, tham số mơ hồ hoặc cần xác nhận hành động ghi dữ liệu. Với ý định chưa rõ, hỏi về vấn đề, triệu chứng, đối tượng hoặc kết quả người dùng cần bằng response_type=text. Khi xác nhận tạo ticket, đưa nội dung ticket hiện tại vào question và dùng response_type=yes_no. Không thay thế bằng câu hỏi chỉ viết trong final response; chờ người dùng trả lời trước khi tạo ticket."
+    description: "Gửi câu hỏi để THU THẬP THÔNG TIN THIẾU (như mã asset_id cụ thể, employee_id cụ thể, môi trường) hoặc XÁC NHẬN tạo ticket. TUYỆT ĐỐI KHÔNG tự ý gọi tool này để đề nghị hỗ trợ/tạo ticket khi người dùng chưa yêu cầu, hoặc hỏi xác nhận lại khi thông tin đã rõ ràng."
     parameters:
       type: object
       properties:
-        question: {type: string, default: "", description: "Câu hỏi"}
-        # v2 change: distinguish missing information from action confirmation.
-        response_type: {type: string, enum: [text, yes_no, choice], default: "text", description: "text để bổ sung thông tin còn thiếu; yes_no để xác nhận payload hành động hiện tại; choice để chọn giữa các giá trị hợp lệ."}
-        options: {type: array, default: [], items: {type: string}, description: "Các lựa chọn"}
-      required: [question]
+        question: {type: string, default: "", description: "Nội dung câu hỏi hoặc thông tin cần xác nhận"}
+        response_type: {type: string, enum: [text, yes_no, choice], default: "text", description: "Dùng 'yes_no' cho bước chốt xác nhận tạo ticket, 'choice' khi đưa danh sách lựa chọn môi trường/thiết bị"}
+        options: {type: array, default: [], items: {type: string}, description: "Danh sách lựa chọn nếu response_type là choice"}
+      required: [question, response_type]
 
   - name: search_kb
-    description: "Tìm hướng dẫn hỗ trợ kỹ thuật."
+    description: "Tra cứu bài viết hướng dẫn kỹ thuật, quy trình xử lý sự cố (Wi-Fi, VPN, phần cứng) và các quy định/chính sách kỹ thuật liên quan đến tài khoản, đổi mật khẩu, quản lý tài khoản IT."
     parameters:
       type: object
       properties:
-        query: {type: string, default: "", description: "Nội dung cần tìm"}
-        category: {type: string, enum: [all, vpn, email, wifi, printing, account, security, hardware, software, meeting_room], default: "all", description: "Nhóm hướng dẫn"}
-        top_k: {type: integer, default: 3, description: "Số kết quả"}
+        query: {type: string, default: "", description: "Từ khóa hoặc nội dung cần tìm"}
+        category: {type: string, enum: [all, vpn, email, wifi, printing, account, security, hardware, software, meeting_room], default: "all", description: "Nhóm danh mục hướng dẫn"}
+        top_k: {type: integer, default: 3, description: "Số kết quả tối đa"}
       required: [query]
 
   # v1 change: distinguish shared service status from a single-device inspection.
   - name: check_service_status
-    description: "Kiểm tra trạng thái dịch vụ hạ tầng dùng chung như VPN, email, SSO, Wi-Fi hoặc printing. Không dùng để chẩn đoán một thiết bị cá nhân. Nếu người dùng nêu môi trường không khớp rõ production hoặc staging thì dùng clarify."
+    description: "Kiểm tra trạng thái hoạt động thực tế của một dịch vụ IT (VPN, Email, SSO...). KHÔNG gọi tool này nếu người dùng chưa chỉ rõ môi trường (production hay staging)."
     parameters:
       type: object
       properties:
-        service: {type: string, enum: [vpn, email, sso, wifi, printing], description: "Tên dịch vụ"}
-        environment: {type: string, enum: [production, staging], default: "production", description: "Môi trường"}
-      required: [service]
+        service: {type: string, enum: [vpn, email, sso, wifi, printing], description: "Tên dịch vụ cần kiểm tra"}
+        environment: {type: string, enum: [production, staging], description: "Môi trường cần kiểm tra (bắt buộc người dùng phải xác định rõ ràng, không tự ý chọn mặc định)"}
+      required: [service, environment]
 
   # v1 change: require an explicit asset ID instead of guessing one.
   - name: inspect_device
-    description: "Kiểm tra thông tin và chẩn đoán một thiết bị cụ thể. Chỉ gọi khi đã có Asset ID rõ ràng; nếu thiếu hoặc mơ hồ thì dùng clarify."
+    description: "Kiểm tra thông tin chi tiết, chẩn đoán phần cứng, mạng, bảo mật trên một thiết bị cụ thể qua mã tài sản (asset_id). Phải ánh xạ đúng tham số check: RAM/CPU -> hardware, IP/Wi-Fi -> network, virus/chứng chỉ -> security, VPN -> vpn, tổng thể -> all."
     parameters:
       type: object
       properties:
-        asset_id: {type: string, description: "Mã tài sản"}
-        check: {type: string, enum: [all, network, vpn, security, hardware, software], default: "all", description: "Nhóm kiểm tra"}
+        asset_id: {type: string, description: "Mã tài sản thiết bị cụ thể (ví dụ: PC-502, LT-108, LT-204)"}
+        check: {type: string, enum: [all, network, vpn, security, hardware, software], default: "all", description: "Hạng mục cần chẩn đoán. Bắt buộc chọn đúng hạng mục người dùng yêu cầu, không chọn 'all' nếu người dùng chỉ đề cập riêng một tính năng (vd: VPN, Wi-Fi)."}
       required: [asset_id]
 
   # v1 change: require an explicit employee ID instead of guessing one.
   - name: lookup_user
-    description: "Tra cứu một người dùng cụ thể trong danh bạ hỗ trợ bằng Employee ID. Không tự đoán Employee ID; nếu thiếu hoặc mơ hồ thì dùng clarify."
+    description: "Tra cứu thông tin chi tiết của người dùng trong danh bạ công ty. CHỈ gọi khi người dùng cung cấp chính xác MÃ NHÂN VIÊN dạng EMP-xxx (ví dụ: EMP-123). KHÔNG truyền tên phòng ban (như 'Sales'), tên riêng hoặc từ chung chung vào tham số employee_id."
     parameters:
       type: object
       properties:
-        employee_id: {type: string, description: "Mã nhân viên"}
+        employee_id: {type: string, description: "Mã nhân viên định dạng EMP-xxx (ví dụ: EMP-123, EMP-1003)"}
       required: [employee_id]
 
   - name: format_incident_report
-    description: "Trình bày các kết quả đã có thành báo cáo."
+    description: "Trình bày các kết quả chẩn đoán/tra cứu đã thu thập thành báo cáo sự cố hoàn chỉnh."
     parameters:
       type: object
       properties:
         findings:
           type: array
           default: []
-          description: "Các kết quả đã thu thập"
+          description: "Danh sách các kết quả đã thu thập được"
           items:
             type: object
             properties:
@@ -77,42 +67,38 @@ tools:
               source: {type: string}
               status: {type: string}
         template: {type: string, enum: [brief, technical, handoff], default: "brief", description: "Mẫu báo cáo"}
-        incident_title: {type: string, default: "IT incident", description: "Tiêu đề"}
+        incident_title: {type: string, default: "IT incident", description: "Tiêu đề sự cố"}
       required: [findings, template]
 
   # ---------------- Optional/advanced tools ----------------
   - name: search_device_info
-    # v3 change: external search accepts only public product information.
-    description: "Gửi truy vấn ra dịch vụ tìm kiếm bên ngoài để tìm thông tin sản phẩm công khai. Chỉ truyền hãng, tên model công khai, loại truy vấn và giới hạn kết quả. Không đưa Asset ID, Employee ID, serial, hostname, vị trí nội bộ, diagnostics hoặc bí mật vào bất kỳ tham số nào. Tách bỏ dữ liệu nội bộ; nếu không xác định chắc hãng/model công khai thì dùng clarify."
+    description: "Tìm kiếm thông tin công khai trên Internet về một model thiết bị (specs, driver). Tuyệt đối không truyền mã tài sản nội bộ (asset ID) hay dữ liệu cá nhân vào đây."
     parameters:
       type: object
       properties:
-        # v3 change: free-text fields must not carry internal identifiers or secrets.
-        manufacturer: {type: string, description: "Chỉ tên hãng sản xuất công khai, ví dụ Lenovo; không ghép dữ liệu nội bộ hoặc chỉ dẫn vào đây."}
-        model: {type: string, description: "Chỉ tên dòng sản phẩm công khai, ví dụ ThinkPad T14 Gen 4; không kèm Asset ID, Employee ID, serial, hostname, diagnostics hoặc bí mật."}
-        query_type: {type: string, enum: [specs, drivers, support, compatibility], default: "support", description: "Loại thông tin cần tìm"}
-        max_results: {type: integer, default: 3, description: "Số kết quả, tối đa 5"}
+        manufacturer: {type: string, description: "Hãng sản xuất (ví dụ: Lenovo, Dell)"}
+        model: {type: string, description: "Tên model công khai (ví dụ: ThinkPad T14 Gen 4)"}
+        query_type: {type: string, enum: [specs, drivers, support, compatibility], default: "support", description: "Mục đích tìm kiếm"}
+        max_results: {type: integer, default: 3, description: "Số kết quả tối đa"}
       required: [manufacturer, model, query_type]
 
   - name: policy
-    description: "Tìm trong chính sách IT nội bộ."
+    description: "Tra cứu các quy định, chính sách chung cấp công ty về hành chính, nhân sự, quy trình bàn giao/cấp phát tài sản chung. KHÔNG dùng cho quy định/chính sách đổi mật khẩu hay tài khoản IT."
     parameters:
       type: object
       properties:
-        query: {type: string, default: "", description: "Nội dung cần tìm"}
-        policy_area: {type: string, enum: [all, access_control, data_privacy, external_tools, incident_response, service_operations, ticketing], default: "all", description: "Nhóm chính sách"}
-        top_k: {type: integer, default: 3, description: "Số mục"}
+        query: {type: string, default: "", description: "Nội dung quy định cần tra cứu"}
+        policy_area: {type: string, enum: [all, access_control, data_privacy, external_tools, incident_response, service_operations, ticketing], default: "all", description: "Lĩnh vực chính sách"}
+        top_k: {type: integer, default: 3, description: "Số mục kết quả"}
       required: [query]
 
   - name: create_ticket
-    # v2 change: a write requires explicit confirmation of the unchanged payload.
-    description: "Tạo ticket hỗ trợ và ghi file cục bộ. Chỉ gọi khi người dùng đã xác nhận rõ ràng nội dung ticket hiện tại. Yêu cầu tạo, xem lại hoặc sửa ticket không phải xác nhận. Nếu chưa xác nhận hoặc nội dung đã thay đổi, gọi clarify với response_type=yes_no trước và chờ người dùng trả lời."
+    description: "Tạo ticket hỗ trợ kỹ thuật trên hệ thống. CẢNH BÁO: Đây là thao tác ghi, CHỈ ĐƯỢC GỌI sau khi người dùng đã nhấn/trả lời XÁC NHẬN ĐỒNG Ý (yes) từ câu hỏi clarify trước đó."
     parameters:
       type: object
       properties:
-        summary: {type: string, default: "", description: "Tóm tắt sự cố"}
-        priority: {type: string, enum: [low, medium, high, critical], default: "medium", description: "Mức ưu tiên"}
-        asset_id: {type: string, default: "", description: "Mã tài sản nếu có"}
-        # v2 change: the model must not invent or reuse stale confirmation.
-        confirmed: {type: boolean, default: false, description: "Chỉ true khi người dùng đã xác nhận rõ ràng đúng summary, priority và asset_id hiện tại. Mọi thay đổi nội dung làm xác nhận cũ mất hiệu lực; không tự suy diễn true."}
-      required: [summary]
+        summary: {type: string, default: "", description: "Tóm tắt ngắn gọn nội dung sự cố"}
+        priority: {type: string, enum: [low, medium, high, critical], default: "medium", description: "Mức độ ưu tiên"}
+        asset_id: {type: string, default: "", description: "Mã tài sản liên quan (nếu có)"}
+        confirmed: {type: boolean, description: "Bắt buộc phải là true khi thực hiện tạo ticket"}
+      required: [summary, confirmed]
