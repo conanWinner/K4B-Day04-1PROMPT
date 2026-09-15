@@ -1,5 +1,6 @@
 tools:
   # ---------------- Core tools ----------------
+  # v1 change: clarify is the required control tool for missing or ambiguous input.
   - name: clarify
     description: "Gửi câu hỏi để THU THẬP THÔNG TIN THIẾU (như mã asset_id cụ thể, employee_id cụ thể, môi trường) hoặc XÁC NHẬN tạo ticket. TUYỆT ĐỐI KHÔNG tự ý gọi tool này để đề nghị hỗ trợ/tạo ticket khi người dùng chưa yêu cầu, hoặc hỏi xác nhận lại khi thông tin đã rõ ràng."
     parameters:
@@ -20,6 +21,7 @@ tools:
         top_k: {type: integer, default: 3, description: "Số kết quả tối đa"}
       required: [query]
 
+  # v1 change: distinguish shared service status from a single-device inspection.
   - name: check_service_status
     description: "Kiểm tra trạng thái hoạt động thực tế của một dịch vụ IT (VPN, Email, SSO...). KHÔNG gọi tool này nếu người dùng chưa chỉ rõ môi trường (production hay staging)."
     parameters:
@@ -29,6 +31,7 @@ tools:
         environment: {type: string, enum: [production, staging], description: "Môi trường cần kiểm tra (bắt buộc người dùng phải xác định rõ ràng, không tự ý chọn mặc định)"}
       required: [service, environment]
 
+  # v1 change: require an explicit asset ID instead of guessing one.
   - name: inspect_device
     description: "Kiểm tra thông tin chi tiết, chẩn đoán phần cứng, mạng, bảo mật trên một thiết bị cụ thể qua mã tài sản (asset_id). Phải ánh xạ đúng tham số check: RAM/CPU -> hardware, IP/Wi-Fi -> network, virus/chứng chỉ -> security, VPN -> vpn, tổng thể -> all."
     parameters:
@@ -38,6 +41,7 @@ tools:
         check: {type: string, enum: [all, network, vpn, security, hardware, software], default: "all", description: "Hạng mục cần chẩn đoán. Bắt buộc chọn đúng hạng mục người dùng yêu cầu, không chọn 'all' nếu người dùng chỉ đề cập riêng một tính năng (vd: VPN, Wi-Fi)."}
       required: [asset_id]
 
+  # v1 change: require an explicit employee ID instead of guessing one.
   - name: lookup_user
     description: "Tra cứu thông tin chi tiết của người dùng trong danh bạ công ty. CHỈ gọi khi người dùng cung cấp chính xác MÃ NHÂN VIÊN dạng EMP-xxx (ví dụ: EMP-123). KHÔNG truyền tên phòng ban (như 'Sales'), tên riêng hoặc từ chung chung vào tham số employee_id."
     parameters:
