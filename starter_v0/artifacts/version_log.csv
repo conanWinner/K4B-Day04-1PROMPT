@@ -1,1 +1,6 @@
-version,author,changed_artifact,artifact_version,prompt_hash,tools_hash,reason,hypothesis,metric_name,metric_before,metric_after,run_file
+version,prompt_tool_change,hypothesis,metric,before,after,run_file
+v0,baseline,,"Base suite pass rate",,21/30,v0_B_base_openai_20260915T185210894545.json
+v1,"Cấm tự đoán ID, bắt buộc hỏi xác nhận trước khi tạo ticket. Làm rõ lookup_user và check_service_status.","Thêm ranh giới an toàn và làm rõ mô tả tool sẽ giúp model không tự đoán bừa.","Base suite pass rate",21/30,25/30,v1_B_base_openai_20260915T191950220671.json
+v2,"Bắt buộc truyền response_type. Hủy xác nhận cũ nếu payload thay đổi.","Ép chặt định dạng response_type sẽ giúp tool clarify chạy đúng. Xử lý triệt để bẫy multi-turn.","Base suite pass rate",25/30,27/30,v2_B_base_openai_20260915T193257012136.json
+v3,"Cấm ép kiểu Enum bừa bãi. Bắt buộc suy luận category cho search_kb.","Sự nghiêm ngặt trong system_prompt sẽ ngăn model tự ý dùng giá trị mặc định.","Base suite pass rate",27/30,28/30,v3_B_base_openai_20260915T193812594029.json
+v4,"Đưa luật BẮT BUỘC trực tiếp vào description của tool trong tools.yaml.","LLM đọc kỹ description của tool hơn. Chèn luật thép vào description sẽ trị dứt điểm tính lười.","Base suite pass rate",28/30,30/30,v4_B_base_openai_20260915T194122978718.json

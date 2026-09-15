@@ -8,7 +8,8 @@
 tools:
   # ---------------- Core tools ----------------
   - name: clarify
-    description: "Gửi một câu hỏi cho người dùng."
+    # Cũ: description: "Gửi một câu hỏi cho người dùng."
+    description: "Gửi một câu hỏi cho người dùng. BẮT BUỘC dùng tool này để hỏi ID còn thiếu (response_type='text'), hỏi xác nhận (response_type='yes_no'), hoặc hỏi lựa chọn (response_type='choice')."
     parameters:
       type: object
       properties:
@@ -18,7 +19,8 @@ tools:
       required: [question]
 
   - name: search_kb
-    description: "Tìm hướng dẫn hỗ trợ kỹ thuật."
+    # Cũ: description: "Tìm hướng dẫn hỗ trợ kỹ thuật."
+    description: "Tìm hướng dẫn hỗ trợ kỹ thuật. KHÔNG để category là 'all' nếu ngữ cảnh đã rõ ràng (ví dụ: Outlook -> email, mạng -> wifi)."
     parameters:
       type: object
       properties:
@@ -28,7 +30,8 @@ tools:
       required: [query]
 
   - name: check_service_status
-    description: "Kiểm tra trạng thái một dịch vụ."
+    # Cũ: description: "Kiểm tra trạng thái một dịch vụ."
+    description: "Kiểm tra trạng thái chung của một dịch vụ hệ thống (VD: VPN, email toàn công ty). KHÔNG dùng tool này để kiểm tra lỗi trên một thiết bị cụ thể. LƯU Ý: Nếu người dùng yêu cầu môi trường lạ (VD: 'demo', 'test') không thuộc [production, staging], BẮT BUỘC gọi tool clarify(response_type='choice', options=['production', 'staging']) để hỏi lại, tuyệt đối KHÔNG ĐƯỢC tự động chọn hay dùng giá trị mặc định."
     parameters:
       type: object
       properties:
@@ -37,7 +40,8 @@ tools:
       required: [service]
 
   - name: inspect_device
-    description: "Kiểm tra thông tin và chẩn đoán thiết bị."
+    # Cũ: description: "Kiểm tra thông tin và chẩn đoán thiết bị."
+    description: "Kiểm tra thông tin và chẩn đoán trên MỘT thiết bị cụ thể. Yêu cầu mã asset_id chính xác (VD: LT-204). LƯU Ý: Nếu ngữ cảnh nhắc đến một vấn đề cụ thể (như VPN, wifi, mạng), hãy đặt tham số `check` tương ứng (VD: 'vpn', 'network') thay vì dùng 'all'."
     parameters:
       type: object
       properties:
@@ -46,7 +50,8 @@ tools:
       required: [asset_id]
 
   - name: lookup_user
-    description: "Tra cứu người dùng trong danh bạ hỗ trợ."
+    # Cũ: description: "Tra cứu người dùng trong danh bạ hỗ trợ."
+    description: "Tra cứu người dùng. Tool này tự động trả về thông tin tài khoản LẪN danh sách thiết bị được cấp (assigned assets). Không cần gọi thêm inspect_device nếu chỉ muốn xem danh sách thiết bị."
     parameters:
       type: object
       properties:
@@ -54,7 +59,8 @@ tools:
       required: [employee_id]
 
   - name: format_incident_report
-    description: "Trình bày các kết quả đã có thành báo cáo."
+    # Cũ: description: "Trình bày các kết quả đã có thành báo cáo."
+    description: "Chỉ định dạng/trình bày các kết quả ĐÃ CÓ sẵn thành báo cáo. KHÔNG gọi tool này để tìm kiếm thêm thông tin."
     parameters:
       type: object
       properties:
@@ -86,7 +92,8 @@ tools:
       required: [manufacturer, model, query_type]
 
   - name: policy
-    description: "Tìm trong chính sách IT nội bộ."
+    # Cũ: description: "Tìm trong chính sách IT nội bộ."
+    description: "Tìm trong chính sách IT nội bộ. BẮT BUỘC chọn `policy_area` phù hợp với nội dung tìm kiếm thay vì dùng 'all'."
     parameters:
       type: object
       properties:
@@ -96,7 +103,8 @@ tools:
       required: [query]
 
   - name: create_ticket
-    description: "Tạo một ticket hỗ trợ."
+    # Cũ: description: "Tạo một ticket hỗ trợ."
+    description: "Tạo một ticket hỗ trợ. Phải gọi clarify(response_type='yes_no') để hỏi ý kiến người dùng trước khi gọi tool này với confirmed=true."
     parameters:
       type: object
       properties:
