@@ -1,7 +1,18 @@
-"""Streamlit UI for the IT Helpdesk Agent. Reuses chat.run_model_tool_loop."""
+"""Streamlit UI for the IT Helpdesk Agent. Reuses chat.run_model_tool_loop.
+
+Ưu tiên hiển thị theo LAB-GUIDE mục 9:
+  1. user request
+  2. final response
+  3. từng tool name và args
+  4. tool result / error
+  5. round / status
+  6. artifact version và hashes
+  7. transcript path
+"""
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from pathlib import Path
 
@@ -18,40 +29,88 @@ load_lab_env(ROOT)
 ARTIFACTS = ROOT / "artifacts"
 TRANSCRIPTS = ROOT / "transcripts"
 
+STATUS_BADGE = {
+    "answered": ("✅", "green"),
+    "waiting_for_user": ("⏸️", "orange"),
+    "max_tool_rounds": ("⚠️", "orange"),
+    "provider_error": ("❌", "red"),
+    "started": ("⏳", "blue"),
+}
+
 
 def result_has_error(result: object) -> bool:
     return isinstance(result, dict) and bool(result.get("error"))
 
 
-def render_rounds(rounds: list) -> None:
+def status_badge(status: str) -> str:
+    icon, color = STATUS_BADGE.get(status, ("•", "gray"))
+    return f":{color}[{icon} {status}]"
+
+
+def render_tool_trace(rounds: list) -> None:
+    """Priority 3, 4, 5 — hiển thị từng tool name, args, result/error, round."""
     if not rounds:
-        st.caption("Không có tool round.")
+        st.caption("Không có tool round (agent trả lời trực tiếp).")
         return
     for round_record in rounds:
         index = round_record.get("round", "?")
         calls = round_record.get("tool_calls") or []
         results = round_record.get("tool_results") or []
-        with st.expander(f"Round {index} — {len(calls)} tool call(s)", expanded=True):
+        header = f"Round {index} — {len(calls)} tool call(s)"
+        with st.expander(header, expanded=True):
             if not calls:
-                st.write("Không gọi tool. Trả lời trực tiếp.")
-                if round_record.get("assistant_text"):
-                    st.markdown(round_record["assistant_text"])
+                st.write("Không gọi tool.")
                 continue
             for offset, call in enumerate(calls):
                 name = call.get("name", "?")
                 args = call.get("args") or {}
                 event = results[offset] if offset < len(results) else {}
                 result = event.get("result", event)
-                st.markdown(f"**Tool:** `{name}`")
-                st.markdown("**Tham số (args)**")
-                st.json(args)
-                st.markdown("**Kết quả / lỗi**")
-                if result_has_error(result):
-                    st.error(result.get("error") or result)
+                is_error = result_has_error(result)
+                st.markdown(
+                    f"**Tool `#{offset + 1}`:** `{name}` "
+                    f"{'· :red[ERROR]' if is_error else '· :green[OK]'}"
+                )
+                col_a, col_r = st.columns(2)
+                with col_a:
+                    st.caption("Args")
+                    st.json(args)
+                with col_r:
+                    st.caption("Result / Error")
+                    if is_error:
+                        msg = result.get("error") if isinstance(result, dict) else str(result)
+                        st.error(msg or "unknown error")
                     st.json(result)
-                else:
-                    st.json(result)
-                st.divider()
+                if offset < len(calls) - 1:
+                    st.divider()
+
+
+def render_turn(turn: dict, expanded_trace: bool = True) -> None:
+    """Render một turn hoàn chỉnh: 1. user, 2. final response, 3–5. tool trace, status."""
+    # Priority 1 — user request
+    with st.chat_message("user"):
+        st.markdown(turn.get("user", ""))
+
+    # Priority 2 — final response
+    with st.chat_message("assistant"):
+        text = turn.get("assistant_text") or "_(không có nội dung)_"
+        st.markdown(text)
+
+        # Priority 5 — round / status
+        status = turn.get("status", "unknown")
+        rounds = turn.get("rounds") or []
+        cols = st.columns([1, 1, 3])
+        cols[0].markdown(f"**Status:** {status_badge(status)}")
+        cols[1].markdown(f"**Rounds:** `{len(rounds)}`")
+        cols[2].markdown(f"**Turn #:** `{turn.get('turn_index', '?')}`")
+
+        if turn.get("error"):
+            st.error(turn["error"])
+
+        # Priority 3, 4, 5 — tool trace theo từng round
+        label = f"🔧 Tool trace ({len(rounds)} round(s))"
+        with st.expander(label, expanded=expanded_trace):
+            render_tool_trace(rounds)
 
 
 def ensure_session(provider_name: str, version: str, model: str | None) -> None:
@@ -90,7 +149,10 @@ def ensure_session(provider_name: str, version: str, model: str | None) -> None:
 
 st.set_page_config(page_title="Northstar IT Helpdesk", layout="wide")
 st.title("Northstar Labs — IT Helpdesk Agent")
-st.caption("UI dùng chung `run_model_tool_loop` với CLI. Trace từng bước chọn tool, args, result và artifact version.")
+st.caption(
+    "UI dùng chung `run_model_tool_loop` với CLI. Ưu tiên hiển thị: "
+    "user request · final response · tool name/args · result/error · round/status · artifact version · transcript."
+)
 
 with st.sidebar:
     st.header("Phiên làm việc")
@@ -106,42 +168,63 @@ with st.sidebar:
             st.error(f"{type(exc).__name__}: {exc}")
 
     if st.session_state.get("ready"):
-        art = st.session_state.artifact
-        st.subheader("Artifact version")
-        st.code(art.artifact_version, language=None)
-        st.caption(f"prompt_hash `{art.prompt_hash[:12]}`")
-        st.caption(f"tools_hash `{art.tools_hash[:12]}`")
-        st.caption(f"provider `{st.session_state.provider_name}`")
-        st.caption(f"transcript `{st.session_state.transcript_path.name}`")
+        st.divider()
+        st.subheader("Debug")
+        with st.expander("System prompt", expanded=False):
+            st.code(st.session_state.system_prompt, language="markdown")
+        with st.expander("Tool declarations", expanded=False):
+            st.json(st.session_state.openai_tools)
 
 if not st.session_state.get("ready"):
     st.info("Chọn provider rồi bấm **Bắt đầu / reset**. Cần API key trong `.env` khớp provider.")
     st.stop()
 
-left, right = st.columns([1.15, 1])
+# ============================================================
+# Priority 6 + 7 — Artifact version, hashes và transcript path
+# (đặt ở top, luôn thấy được)
+# ============================================================
+art = st.session_state.artifact
+transcript_path: Path = st.session_state.transcript_path
 
-with left:
-    st.subheader("Hội thoại")
-    for turn in st.session_state.turns:
-        with st.chat_message("user"):
-            st.markdown(turn["user"])
-        with st.chat_message("assistant"):
-            st.markdown(turn.get("assistant_text") or "")
-            st.caption(f"status = `{turn.get('status')}` · rounds = {len(turn.get('rounds') or [])}")
+st.subheader("📌 Session metadata")
+meta = st.columns([2, 1, 1, 1, 1])
+meta[0].markdown(f"**Artifact version**  \n`{art.artifact_version}`")
+meta[1].markdown(f"**prompt_hash**  \n`{art.prompt_hash[:12]}`")
+meta[2].markdown(f"**tools_hash**  \n`{art.tools_hash[:12]}`")
+meta[3].markdown(f"**Provider**  \n`{st.session_state.provider_name}`")
+meta[4].markdown(
+    f"**Model**  \n`{st.session_state.model or getattr(st.session_state.provider, 'default_model', 'default')}`"
+)
 
-    user_text = st.chat_input("Nhập yêu cầu IT helpdesk…")
-
-with right:
-    st.subheader("Tool trace")
-    if not st.session_state.turns:
-        st.caption("Gửi một câu hỏi để xem tool name, args và result theo từng round.")
+with st.expander("📁 Transcript path", expanded=False):
+    st.code(str(transcript_path), language=None)
+    if transcript_path.exists():
+        st.download_button(
+            "⬇️ Download transcript JSON",
+            data=transcript_path.read_bytes(),
+            file_name=transcript_path.name,
+            mime="application/json",
+        )
     else:
-        latest = st.session_state.turns[-1]
-        st.markdown(f"**User request:** {latest['user']}")
-        st.markdown(f"**Status:** `{latest.get('status')}`")
-        render_rounds(latest.get("rounds") or [])
-        if latest.get("error"):
-            st.error(latest["error"])
+        st.caption("Transcript sẽ được ghi sau turn đầu tiên.")
+
+st.divider()
+
+# ============================================================
+# Priority 1–5 — Conversation + tool trace theo từng turn
+# ============================================================
+st.subheader("💬 Conversation")
+
+if not st.session_state.turns:
+    st.caption("Chưa có turn nào. Nhập câu hỏi ở dưới để bắt đầu.")
+else:
+    last_index = len(st.session_state.turns) - 1
+    for idx, turn in enumerate(st.session_state.turns):
+        render_turn(turn, expanded_trace=(idx == last_index))
+        if idx < last_index:
+            st.divider()
+
+user_text = st.chat_input("Nhập yêu cầu IT helpdesk…")
 
 if user_text:
     messages = [
